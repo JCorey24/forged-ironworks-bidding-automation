@@ -1,0 +1,16 @@
+{
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "scripts": {
+    "test:scope": "vitest run tests/scope-resolver.test.ts tests/pricing-scope.test.ts",
+    "check:scope": "tsx scripts/check-scope.ts",
+    "typecheck:scope": "tsc --noEmit -p tsconfig.scope-fix.json"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  }
+}
