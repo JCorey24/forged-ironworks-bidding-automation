@@ -126,6 +126,7 @@ export interface ProjectPricingIssue {
   quantity: number;
   takeoffRecordIds: string[];
   message: string;
+  assemblyIds?: string[];
 }
 
 export interface ProjectPricingReadiness {
@@ -533,7 +534,7 @@ function addIssue(issues: ProjectPricingIssue[], severity: "REVIEW" | "BLOCKER",
 }
 
 function fromAssemblyException(exception: GroupedAssemblyException): ProjectPricingIssue {
-  return { severity: exception.severity, code: exception.code, cause: exception.cause, quantity: exception.quantity, takeoffRecordIds: exception.lineItemIds, message: exception.message };
+  return { severity: exception.severity, code: exception.code, cause: exception.cause, quantity: exception.quantity, takeoffRecordIds: exception.lineItemIds, message: exception.message, assemblyIds: [exception.assemblyId] };
 }
 
 function groupIssues(issues: readonly ProjectPricingIssue[]): ProjectPricingIssue[] {
@@ -545,9 +546,14 @@ function groupIssues(issues: readonly ProjectPricingIssue[]): ProjectPricingIssu
       existing.quantity += issue.quantity;
       existing.takeoffRecordIds.push(...issue.takeoffRecordIds);
       existing.message = `${issue.cause} (${existing.quantity} occurrences)`;
+      existing.assemblyIds = unique([...(existing.assemblyIds ?? []), ...(issue.assemblyIds ?? [])]);
     } else grouped.set(key, { ...issue, takeoffRecordIds: [...issue.takeoffRecordIds], message: `${issue.cause} (${issue.quantity} occurrence${issue.quantity === 1 ? "" : "s"})` });
   }
   return [...grouped.values()];
+}
+
+function unique<T>(items: readonly T[]): T[] {
+  return [...new Set(items)];
 }
 
 function validPositive(value: number | null | undefined): value is number {

@@ -15,6 +15,7 @@ export * from "./assemblies/evaluate-project-assemblies";
 export * from "./services/scope-resolver";
 export * from "./services/pricing-scope";
 export * from "./services/project-pricing";
+export * from "./services/estimator-review-report";
 export * from "./validation/validate-line-item-scope";
 export * from "./validation/validate-takeoff-line";
 export * from "./validation/validate-project-scope";
