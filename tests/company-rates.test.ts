@@ -59,6 +59,7 @@ describe("centralized company rates", () => {
     "STRUCTURAL_METAL_DECK",
     "HARDWARE_JOIST_BEARING",
     "HARDWARE_WOOD_NAILER",
+    "HARDWARE_WOOD_NAILER_WASHER",
     "HARDWARE_BRIDGING_TERMINATION",
   ] as const)(
     "keeps %s quote-required instead of allowing a zero price",

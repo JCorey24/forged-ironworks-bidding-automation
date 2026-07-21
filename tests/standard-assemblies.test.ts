@@ -80,7 +80,7 @@ describe("standard assembly library", () => {
     const nailer = result.applications.find((item) => item.assemblyId === "WOOD_NAILER_HARDWARE");
 
     expect(nailer?.components[0]).toEqual(
-      expect.objectContaining({ quantity: 13, rateKey: "HARDWARE_WOOD_NAILER", quoteRequired: true }),
+      expect.objectContaining({ quantity: 12, rateKey: "HARDWARE_WOOD_NAILER", quoteRequired: true }),
     );
     expect(nailer?.outcome).toBe("BLOCKED");
   });

@@ -99,25 +99,32 @@ function plateAssembly(
 }
 
 function beamEnds(input: AssemblyMemberInput): AssemblyApplication {
+  const endCount =
+    FORGED_IRONWORKS_ESTIMATING_PROFILE.assemblyQuantities
+      .wfBeamEndsPerMember.value;
   const hasBoltCount = positiveInteger(input.boltsPerBeamEnd);
   const components = [
     component(
-      "beam-end-connection-allowance",
+      "beam-end-connection-scope",
       null,
       "EA",
-      "ALLOWANCE",
+      "COMPANY_DEFAULT",
       "HARDWARE_FIELD_BOLT",
     ),
   ];
   if (hasBoltCount) {
-    components.push(
-      component("field-bolts", input.boltsPerBeamEnd! * 2, "EA", "DRAWING", "HARDWARE_FIELD_BOLT"),
-    );
+    components.push(component(
+      "field-bolts",
+      input.boltsPerBeamEnd! * endCount,
+      "EA",
+      "DRAWING",
+      "HARDWARE_FIELD_BOLT",
+    ));
   }
   return result(
     "WF_BEAM_END",
     input,
-    2,
+    endCount,
     components,
     hasBoltCount ? [] : ["final connection bolt quantity"],
     false,
@@ -148,36 +155,86 @@ function joistBearing(input: AssemblyMemberInput): AssemblyApplication {
 }
 
 function woodNailer(input: AssemblyMemberInput): AssemblyApplication {
-  const spacing = input.woodNailer?.fastenerSpacingIn;
+  const policy =
+    FORGED_IRONWORKS_ESTIMATING_PROFILE.assemblyQuantities.woodNailer;
+  const spacing = input.woodNailer?.fastenerSpacingIn ?? policy.spacingIn.value;
+  const nonstandardSpacing = spacing !== policy.spacingIn.value;
   const missing = [
     !positive(input.lengthFt) ? "beam length" : undefined,
     !positive(spacing) ? "fastener spacing" : undefined,
+    nonstandardSpacing ? "fastener spacing differs from approved company spacing" : undefined,
   ].filter(Boolean) as string[];
   const quantity = missing.length === 0
-    ? Math.ceil((input.lengthFt! * 12) / spacing!) + 1
+    ? Math.ceil((input.lengthFt! * 12) / spacing!)
     : null;
   const components = [
-    component("wood-nailer-fasteners", quantity, "EA", "CALCULATED", "HARDWARE_WOOD_NAILER", true),
+    component(
+      "wood-nailer-bolts",
+      quantity,
+      "EA",
+      "CALCULATED",
+      "HARDWARE_WOOD_NAILER",
+      true,
+    ),
+    component(
+      "wood-nailer-washers",
+      quantity === null ? null : quantity * policy.washerPerBolt.value,
+      "EA",
+      "CALCULATED",
+      "HARDWARE_WOOD_NAILER_WASHER",
+      true,
+    ),
   ];
   return result("WOOD_NAILER_HARDWARE", input, 1, components, missing, true);
 }
 
 function perimeterAnchors(input: AssemblyMemberInput): AssemblyApplication {
-  const spacing = input.perimeterAnchors?.spacingIn;
-  const missing = [
-    !positive(input.lengthFt) ? "angle run length" : undefined,
-    !positive(spacing) ? "anchor spacing" : undefined,
+  const policy = FORGED_IRONWORKS_ESTIMATING_PROFILE.assemblyQuantities
+    .perimeterAngleAnchors;
+  const conditions = input.perimeterAnchors;
+  const spacing = conditions?.spacingIn ?? policy.spacingIn.value;
+  if (!positive(input.lengthFt) || !positive(spacing)) {
+    return result(
+      "PERIMETER_ANGLE_ANCHOR",
+      input,
+      1,
+      [],
+      [!positive(input.lengthFt) ? "angle run length" : "anchor spacing"],
+      false,
+    );
+  }
+
+  const specification = conditions?.specification ?? "UNKNOWN";
+  const reviewReasons = [
+    spacing !== policy.spacingIn.value
+      ? "anchor spacing differs from approved company spacing"
+      : undefined,
+    specification !== policy.approvedSpecification
+      ? "anchor specification does not match approved epoxy-anchor scope"
+      : undefined,
+    conditions?.substrateException ? "substrate exception" : undefined,
+    conditions?.cornerException ? "corner exception" : undefined,
+    conditions?.spliceException ? "splice exception" : undefined,
+    conditions?.edgeDistanceException ? "edge-distance exception" : undefined,
   ].filter(Boolean) as string[];
-  const quantity = missing.length === 0
-    ? Math.ceil((input.lengthFt! * 12) / spacing!) + 1
-    : null;
+  const quantity = Math.ceil((input.lengthFt * 12) / spacing);
+  const components = specification === policy.approvedSpecification
+    ? [component(
+        "epoxy-anchors",
+        quantity,
+        "EA",
+        "CALCULATED",
+        "HARDWARE_EPOXY_ANCHOR",
+      )]
+    : [];
   return result(
     "PERIMETER_ANGLE_ANCHOR",
     input,
     1,
-    [component("epoxy-anchors", quantity, "EA", "CALCULATED", "HARDWARE_EPOXY_ANCHOR")],
-    missing,
+    components,
+    reviewReasons,
     false,
+    "REVIEW",
   );
 }
 

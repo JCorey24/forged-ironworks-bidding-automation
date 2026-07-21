@@ -64,6 +64,11 @@ export interface AssemblyMemberInput {
   perimeterAnchors?: {
     required: boolean;
     spacingIn?: number;
+    specification?: "EPOXY_ANCHOR" | "OTHER" | "UNKNOWN";
+    substrateException?: boolean;
+    cornerException?: boolean;
+    spliceException?: boolean;
+    edgeDistanceException?: boolean;
   };
   bridgingTermination?: {
     required: boolean;

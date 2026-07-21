@@ -52,6 +52,22 @@ export interface CompanyEstimatingProfile {
     unexplainedZeroBlocksSubmission: true;
   };
   assemblyApprovalPolicy: AssemblyApprovalPolicy;
+  assemblyQuantities: {
+    wfBeamEndsPerMember: CompanyDefault<number>;
+    woodNailer: {
+      spacingIn: CompanyDefault<number>;
+      quantityMethod: "CEILING_RUN_OVER_SPACING";
+      washerPerBolt: CompanyDefault<number>;
+    };
+    perimeterAngleAnchors: {
+      spacingIn: CompanyDefault<number>;
+      quantityMethod: "CEILING_RUN_OVER_SPACING";
+      approvedSpecification: "EPOXY_ANCHOR";
+    };
+    bridgingTermination: {
+      quantitySource: "DRAWING_SUPPORTED_COUNT_ONLY";
+    };
+  };
 }
 
 const RATES_SOURCE = "reference/rates.md";
@@ -124,11 +140,27 @@ export const FORGED_IRONWORKS_ESTIMATING_PROFILE: CompanyEstimatingProfile = {
     rules: {
       HSS_COLUMN_BASE: pendingRule("HSS_COLUMN_BASE", "AUTO_APPLY", "BLOCKED"),
       HSS_COLUMN_TOP: pendingRule("HSS_COLUMN_TOP", "AUTO_APPLY", "BLOCKED"),
-      WF_BEAM_END: pendingRule("WF_BEAM_END", "AUTO_APPLY", "REVIEW_REQUIRED"),
+      WF_BEAM_END: approvedRule("WF_BEAM_END", "AUTO_APPLY", "REVIEW_REQUIRED"),
       JOIST_BEARING_PLATE: pendingRule("JOIST_BEARING_PLATE", "BLOCKED", "BLOCKED"),
-      WOOD_NAILER_HARDWARE: pendingRule("WOOD_NAILER_HARDWARE", "BLOCKED", "BLOCKED"),
-      PERIMETER_ANGLE_ANCHOR: pendingRule("PERIMETER_ANGLE_ANCHOR", "AUTO_APPLY", "BLOCKED"),
-      BRIDGING_TERMINATION: pendingRule("BRIDGING_TERMINATION", "BLOCKED", "BLOCKED"),
+      WOOD_NAILER_HARDWARE: approvedRule("WOOD_NAILER_HARDWARE", "BLOCKED", "BLOCKED"),
+      PERIMETER_ANGLE_ANCHOR: approvedRule("PERIMETER_ANGLE_ANCHOR", "AUTO_APPLY", "REVIEW_REQUIRED"),
+      BRIDGING_TERMINATION: approvedRule("BRIDGING_TERMINATION", "BLOCKED", "BLOCKED"),
+    },
+  },
+  assemblyQuantities: {
+    wfBeamEndsPerMember: policyApproved(2),
+    woodNailer: {
+      spacingIn: policyApproved(24),
+      quantityMethod: "CEILING_RUN_OVER_SPACING",
+      washerPerBolt: policyApproved(1),
+    },
+    perimeterAngleAnchors: {
+      spacingIn: policyApproved(48),
+      quantityMethod: "CEILING_RUN_OVER_SPACING",
+      approvedSpecification: "EPOXY_ANCHOR",
+    },
+    bridgingTermination: {
+      quantitySource: "DRAWING_SUPPORTED_COUNT_ONLY",
     },
   },
 };
@@ -148,5 +180,27 @@ function pendingRule(
     managementApproval: "PENDING",
     completeInputOutcome,
     incompleteInputOutcome,
+  };
+}
+
+function approvedRule(
+  assemblyId: keyof AssemblyApprovalPolicy["rules"],
+  completeInputOutcome: "AUTO_APPLY" | "REVIEW_REQUIRED" | "BLOCKED",
+  incompleteInputOutcome: "REVIEW_REQUIRED" | "BLOCKED",
+): AssemblyApprovalPolicy["rules"][typeof assemblyId] {
+  return {
+    assemblyId,
+    assemblyVersion: 1,
+    managementApproval: "APPROVED",
+    completeInputOutcome,
+    incompleteInputOutcome,
+  };
+}
+
+function policyApproved(value: number): CompanyDefault<number> {
+  return {
+    value,
+    approval: "APPROVED",
+    source: "Forged Ironworks company policy supplied 2026-07-21",
   };
 }
