@@ -1,4 +1,11 @@
 {
+  "name": "forged-ironworks-bidding-automation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scope validation and pricing foundation for Forged Ironworks bids.",
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@types/node": "^26.1.1",
     "tsx": "^4.19.0",
@@ -6,9 +13,12 @@
     "vitest": "^3.0.0"
   },
   "scripts": {
+    "test": "vitest run",
     "test:scope": "vitest run tests/scope-resolver.test.ts tests/pricing-scope.test.ts",
-    "check:scope": "tsx scripts/check-scope.ts",
-    "typecheck:scope": "tsc --noEmit -p tsconfig.scope-fix.json"
+    "check:scope": "node --import tsx scripts/check-scope.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.scope-fix.json",
+    "typecheck:scope": "npm run typecheck",
+    "validate": "npm run typecheck && npm test && npm run check:scope"
   },
   "dependencies": {
     "exceljs": "^4.4.0"
