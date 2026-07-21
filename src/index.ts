@@ -5,4 +5,5 @@ export * from "./config/scope-overrides";
 export * from "./services/scope-resolver";
 export * from "./services/pricing-scope";
 export * from "./validation/validate-line-item-scope";
+export * from "./validation/validate-takeoff-line";
 export * from "./validation/validate-project-scope";
