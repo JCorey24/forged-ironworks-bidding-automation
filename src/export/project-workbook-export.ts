@@ -147,7 +147,7 @@ export function createProjectWorkbookExportModel(
   }
 
   const actions = reviewReport.requiredEstimatorActions;
-  const unresolvedScope: UnresolvedScopeExportRow[] = [
+  const unresolvedRows: UnresolvedScopeExportRow[] = [
     ...pricing.unresolvedLines,
     ...pricing.quoteRequiredLines,
   ].map((line) => unresolvedRow(
@@ -160,7 +160,7 @@ export function createProjectWorkbookExportModel(
   ));
   for (const category of pricing.unresolvedCostCategories) {
     const action = actionForCostCategory(category, actions);
-    unresolvedScope.push({
+    unresolvedRows.push({
       description: humanize(category),
       quantityOrBasis: "Not supplied",
       reasonUnpriced: action?.whatIsMissing ?? `${humanize(category)} input is unresolved.`,
@@ -212,9 +212,9 @@ export function createProjectWorkbookExportModel(
       warning: "INTERNAL DRAFT — total excludes unresolved scope and is not ready for submission.",
     },
     pricedScope,
-    unresolvedScope,
+    unresolvedScope: groupUnresolvedRows(unresolvedRows),
     estimatorReview: actions.map((action) => ({
-      priority: `${action.priorityRank} - ${action.priority}`,
+      priority: `${action.priorityRank} - ${humanize(action.priority)}`,
       classification: action.severity,
       requiredAction: action.whatIsMissing,
       whyItMatters: action.whyItMatters,
@@ -251,11 +251,24 @@ export async function exportProjectPricingWorkbook(
 
 function addSummarySheet(workbook: ExcelJS.Workbook, summary: EstimateSummaryExport): void {
   const sheet = workbook.addWorksheet("Estimate Summary");
+  configureSheet(sheet);
   sheet.addRow(["Estimate Summary"]);
-  for (const [key, value] of Object.entries(summary)) sheet.addRow([humanize(key), value ?? "Not available"]);
+  for (const [key, value] of Object.entries(summary)) {
+    const displayValue = typeof value === "boolean" ? (value ? "YES" : "NO") : value;
+    const row = sheet.addRow([humanize(key), displayValue ?? "Not available"]);
+    if (["supportedDraftTotal", "directCostSubtotal", "indirectCostSubtotal", "taxableSubtotal", "tax", "markup"].includes(key) && typeof value === "number") {
+      row.getCell(2).numFmt = "$#,##0.00";
+    }
+    if (key === "warning") {
+      row.height = 36;
+      row.getCell(2).font = { bold: true, color: { argb: "FF9C0006" } };
+      row.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFC7CE" } };
+    }
+  }
   sheet.getRow(1).font = { bold: true, size: 14 };
   sheet.getColumn(1).width = 28;
-  sheet.getColumn(2).width = 80;
+  sheet.getColumn(2).width = 68;
+  sheet.getColumn(2).alignment = { wrapText: true, vertical: "top" };
 }
 
 function addTableSheet(
@@ -265,14 +278,101 @@ function addTableSheet(
   rows: readonly object[],
 ): void {
   const sheet = workbook.addWorksheet(name);
+  configureSheet(sheet);
   sheet.addRow(headers.map(humanize));
   for (const row of rows) {
     const values = row as Record<string, unknown>;
-    sheet.addRow(headers.map((header) => values[header] ?? ""));
+    sheet.addRow(headers.map((header) => {
+      const value = values[header];
+      return typeof value === "boolean" ? (value ? "YES" : "NO") : value ?? "";
+    }));
   }
   sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).height = 30;
+  sheet.getRow(1).alignment = { wrapText: true, vertical: "middle" };
+  sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9EAF7" } };
   sheet.views = [{ state: "frozen", ySplit: 1 }];
-  headers.forEach((_, index) => { sheet.getColumn(index + 1).width = 24; });
+  sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: headers.length } };
+  headers.forEach((header, index) => {
+    const column = sheet.getColumn(index + 1);
+    column.width = columnWidth(header);
+    column.alignment = { wrapText: true, vertical: "top" };
+    if (header === "extendedCost") column.numFmt = "$#,##0.00";
+  });
+  const rowHeight = name === "Estimator Review" ? 66 : name === "Unresolved Scope" ? 54 : 30;
+  for (let row = 2; row <= sheet.rowCount; row += 1) sheet.getRow(row).height = rowHeight;
+}
+
+function configureSheet(sheet: ExcelJS.Worksheet): void {
+  sheet.pageSetup = {
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: { left: 0.25, right: 0.25, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
+  };
+  sheet.properties.defaultRowHeight = 18;
+}
+
+function columnWidth(header: string): number {
+  const widths: Record<string, number> = {
+    description: 28,
+    costCategory: 16,
+    quantity: 13,
+    quantityOrBasis: 16,
+    unit: 14,
+    rate: 13,
+    rateKey: 27,
+    rateSource: 32,
+    calculationMethod: 30,
+    extendedCost: 16,
+    traceabilityReference: 34,
+    traceabilityIds: 42,
+    status: 16,
+    reasonUnpriced: 34,
+    missingInput: 40,
+    responsibleRole: 26,
+    pricingOrSubmissionEffect: 25,
+    relatedActionId: 42,
+    priority: 25,
+    classification: 16,
+    requiredAction: 38,
+    whyItMatters: 42,
+    requiredResolution: 44,
+    draftPricingMayContinue: 18,
+    value: 14,
+    source: 24,
+    approvalStatus: 18,
+  };
+  return widths[header] ?? 22;
+}
+
+function groupUnresolvedRows(rows: readonly UnresolvedScopeExportRow[]): UnresolvedScopeExportRow[] {
+  const grouped = new Map<string, UnresolvedScopeExportRow>();
+  for (const row of rows) {
+    const key = [row.description, row.reasonUnpriced, row.relatedActionId, unitFromBasis(row.quantityOrBasis)].join("|");
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...row });
+      continue;
+    }
+    const existingQuantity = numericBasis(existing.quantityOrBasis);
+    const nextQuantity = numericBasis(row.quantityOrBasis);
+    if (existingQuantity !== null && nextQuantity !== null) {
+      existing.quantityOrBasis = `${existingQuantity + nextQuantity} ${unitFromBasis(row.quantityOrBasis)}`.trim();
+    }
+    existing.traceabilityReference = `${existing.traceabilityReference}|${row.traceabilityReference}`;
+  }
+  return [...grouped.values()];
+}
+
+function numericBasis(value: string): number | null {
+  const match = value.match(/^(\d+(?:\.\d+)?)\s/);
+  return match ? Number(match[1]) : null;
+}
+
+function unitFromBasis(value: string): string {
+  return value.replace(/^\d+(?:\.\d+)?\s*/, "");
 }
 
 function unresolvedRow(

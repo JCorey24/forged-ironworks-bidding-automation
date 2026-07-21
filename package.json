@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:scope": "vitest run tests/scope-resolver.test.ts tests/pricing-scope.test.ts",
     "check:scope": "node --import tsx scripts/check-scope.ts",
+    "export:alphabet-academy": "node --import tsx scripts/export-alphabet-academy.ts",
     "typecheck": "tsc --noEmit -p tsconfig.scope-fix.json",
     "typecheck:scope": "npm run typecheck",
     "validate": "npm run typecheck && npm test && npm run check:scope"
