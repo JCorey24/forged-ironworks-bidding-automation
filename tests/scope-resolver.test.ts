@@ -64,11 +64,16 @@ describe("line-item scope resolver", () => {
     const line: TakeoffLine = {
       id: "beam-001",
       pricingGroupId: "WF_BEAMS",
+      memberMark: "B1",
+      section: "W21x48",
       description: "W21x48 roof beam",
       category: "STRUCTURAL_BEAM",
       quantity: 1,
       unit: "EA",
-      drawingSheet: "S-102",
+      lengthFt: 20,
+      source: { category: "DRAWING_DERIVED", sheet: "S-102" },
+      confidence: "HIGH",
+      reviewRequired: false,
       scope,
     };
 
@@ -99,11 +104,16 @@ describe("line-item scope resolver", () => {
     const line: TakeoffLine = {
       id: "beam-002",
       pricingGroupId: "WF_BEAMS",
+      memberMark: "B2",
+      section: "W16x31",
       description: "W16x31 roof beam",
       category: "STRUCTURAL_BEAM",
       quantity: 1,
       unit: "EA",
-      drawingSheet: "S-102",
+      lengthFt: 18,
+      source: { category: "DRAWING_DERIVED", sheet: "S-102" },
+      confidence: "HIGH",
+      reviewRequired: false,
       scope,
     };
 
