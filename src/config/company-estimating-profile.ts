@@ -43,6 +43,13 @@ export interface CompanyEstimatingProfile {
     outboundRate: ForgedIronworksRateKey;
     defaultLoadCount: CompanyDefault<number>;
   };
+  costLayers: {
+    supportedTonnageBasis: CompanyDefault<"PRICED_FABRICATED_STEEL_ONLY">;
+    tax: {
+      taxableCostCategories: CompanyDefault<readonly ("MATERIAL" | "HARDWARE" | "ALLOWANCE")[]>;
+    };
+    markupBasis: CompanyDefault<"SUPPORTED_DIRECT_AND_INDIRECT_COSTS_EXCLUDING_TAX">;
+  };
   scope: {
     categoryOverrides: typeof CATEGORY_SCOPE_OVERRIDES;
   };
@@ -124,6 +131,25 @@ export const FORGED_IRONWORKS_ESTIMATING_PROFILE: CompanyEstimatingProfile = {
       value: 1,
       approval: "PENDING_CONFIRMATION",
       source: RATES_SOURCE,
+    },
+  },
+  costLayers: {
+    supportedTonnageBasis: {
+      value: "PRICED_FABRICATED_STEEL_ONLY",
+      approval: "APPROVED",
+      source: RULES_SOURCE,
+    },
+    tax: {
+      taxableCostCategories: {
+        value: ["MATERIAL", "HARDWARE", "ALLOWANCE"],
+        approval: "PENDING_CONFIRMATION",
+        source: RULES_SOURCE,
+      },
+    },
+    markupBasis: {
+      value: "SUPPORTED_DIRECT_AND_INDIRECT_COSTS_EXCLUDING_TAX",
+      approval: "APPROVED",
+      source: RULES_SOURCE,
     },
   },
   scope: {

@@ -6,12 +6,77 @@ import type {
   EstimatingAllowance,
 } from "../assemblies/assembly-types";
 import type { TakeoffLine } from "../models/takeoff-line";
+import {
+  FORGED_IRONWORKS_ESTIMATING_PROFILE,
+  type CompanyEstimatingProfile,
+} from "../config/company-estimating-profile";
 import type { ForgedIronworksRateKey } from "../rates/forged-ironworks-rates";
-import type { RateSource, StandardRate } from "../rates/rate-source";
+import type { RateSource, RateUnit, StandardRate } from "../rates/rate-source";
 import { requireStandardRate } from "../rates/rate-source";
 import { validateProjectScope } from "../validation/validate-project-scope";
 
 export type ProjectCostCategory = "MATERIAL" | "HARDWARE" | "ALLOWANCE";
+export type ProjectLayerCostCategory =
+  | "SHOP_LABOR"
+  | "DETAILING"
+  | "ENGINEERING"
+  | "FREIGHT"
+  | "EQUIPMENT"
+  | "ERECTION_LABOR"
+  | "TAX"
+  | "MARKUP";
+
+export interface ProjectCostLayerLine {
+  id: string;
+  costCategory: ProjectLayerCostCategory;
+  rateKey: ForgedIronworksRateKey;
+  rateSource: string;
+  quantity: number;
+  unit: RateUnit;
+  calculationMethod:
+    | "SUPPORTED_TONS_TIMES_HOURS_PER_TON_TIMES_RATE"
+    | "SUPPORTED_TONS_TIMES_RATE"
+    | "LOAD_COUNT_TIMES_RATE"
+    | "SELECTED_QUANTITY_TIMES_RATE"
+    | "ERECTION_HOURS_TIMES_RATE"
+    | "TAXABLE_SUBTOTAL_TIMES_RATE"
+    | "SUPPORTED_COSTS_TIMES_MARKUP_PERCENT";
+  dependencySource: string;
+  extendedCost: number;
+  status: "FINAL" | "PROVISIONAL" | "REVIEW_REQUIRED" | "BLOCKED";
+  basis?: {
+    supportedFabricatedSteelWeightLb?: number;
+    supportedTonnage?: number;
+    taxableSubtotal?: number;
+    supportedCostSubtotal?: number;
+  };
+}
+
+export interface EquipmentSelection {
+  rateKey: Extract<ForgedIronworksRateKey,
+    | "EQUIPMENT_CRANE"
+    | "EQUIPMENT_RAD_CRANE"
+    | "EQUIPMENT_TELEHANDLER"
+    | "EQUIPMENT_BOOM_LIFT"
+    | "EQUIPMENT_SCISSOR_LIFT"
+    | "EQUIPMENT_WELDER"
+    | "EQUIPMENT_SCAFFOLD"
+    | "EQUIPMENT_PERIMETER_CABLE"
+    | "EQUIPMENT_DELIVERY">;
+  quantity: number;
+  inputSource: string;
+}
+
+export interface ProjectCostInputs {
+  freightLoadCount?: { quantity: number; source: string };
+  equipment?: { required: boolean; selections?: readonly EquipmentSelection[] };
+  erection?: {
+    required: boolean;
+    classification?: "LOCAL" | "REGIONAL" | "TRAVEL";
+    hours?: number;
+    methodologySource?: string;
+  };
+}
 
 export interface ProjectPricedLine {
   id: string;
@@ -79,6 +144,14 @@ export interface ProjectPricingResult {
   groupedReviewItems: ProjectPricingIssue[];
   groupedBlockers: ProjectPricingIssue[];
   subtotalByCostCategory: Record<ProjectCostCategory, number>;
+  projectCostLines: ProjectCostLayerLine[];
+  directCostSubtotal: number;
+  indirectCostSubtotal: number;
+  taxableSubtotal: number | null;
+  tax: number | null;
+  markup: number;
+  supportedDraftTotal: number;
+  unresolvedCostCategories: ProjectLayerCostCategory[];
   readiness: ProjectPricingReadiness;
 }
 
@@ -87,12 +160,14 @@ export interface ProjectPricingInput {
   assemblyApplications?: readonly AssemblyApplication[];
   assemblyExceptions?: readonly AssemblyException[];
   requiredQuoteRateKeys?: readonly ForgedIronworksRateKey[];
+  costInputs?: ProjectCostInputs;
 }
 
 export function priceProject(
   input: ProjectPricingInput,
-  rateSource: RateSource<ForgedIronworksRateKey>,
+  profile: CompanyEstimatingProfile = FORGED_IRONWORKS_ESTIMATING_PROFILE,
 ): ProjectPricingResult {
+  const rateSource = profile.rateSource;
   const material: ProjectPricedLine[] = [];
   const hardware: ProjectPricedLine[] = [];
   const quotes: ProjectQuoteRequiredLine[] = [];
@@ -202,6 +277,15 @@ export function priceProject(
     addIssue(issues, "REVIEW", "TAKEOFF_REVIEW_REQUIRED", line.reviewReason ?? "Takeoff record requires estimator review.", line.id);
   }
 
+  const directCostSubtotal = roundCurrency(
+    sumCost(material) + sumCost(hardware) +
+      allowances.reduce((sum, line) => sum + line.extendedCost, 0),
+  );
+  const costLayers = calculateProjectCostLayers(
+    input, profile, material, hardware, allowances, directCostSubtotal,
+  );
+  issues.push(...costLayers.issues);
+
   const grouped = groupIssues(issues);
   const groupedBlockers = grouped.filter((item) => item.severity === "BLOCKER");
   const groupedReviewItems = grouped.filter((item) => item.severity === "REVIEW");
@@ -222,6 +306,17 @@ export function priceProject(
     groupedReviewItems,
     groupedBlockers,
     subtotalByCostCategory,
+    projectCostLines: costLayers.lines,
+    directCostSubtotal,
+    indirectCostSubtotal: costLayers.indirectCostSubtotal,
+    taxableSubtotal: costLayers.taxableSubtotal,
+    tax: costLayers.tax,
+    markup: costLayers.markup,
+    supportedDraftTotal: roundCurrency(
+      directCostSubtotal + costLayers.indirectCostSubtotal +
+        (costLayers.tax ?? 0) + costLayers.markup,
+    ),
+    unresolvedCostCategories: costLayers.unresolvedCategories,
     readiness: {
       status: readyToSubmit ? "READY_TO_SUBMIT" : readyToPrice ? "READY_TO_PRICE" : "DRAFT",
       draftPricingAllowed: true,
@@ -229,6 +324,146 @@ export function priceProject(
       readyToSubmit,
     },
   };
+}
+
+function calculateProjectCostLayers(
+  input: ProjectPricingInput,
+  profile: CompanyEstimatingProfile,
+  material: readonly ProjectPricedLine[],
+  hardware: readonly ProjectPricedLine[],
+  allowances: readonly ProjectAllowanceLine[],
+  directCostSubtotal: number,
+) {
+  const lines: ProjectCostLayerLine[] = [];
+  const issues: ProjectPricingIssue[] = [];
+  const unresolved = new Set<ProjectLayerCostCategory>();
+  const supportedWeightLb = material
+    .filter((line) => line.unit === "LB")
+    .reduce((sum, line) => sum + line.quantity, 0);
+  const supportedTons = supportedWeightLb / 2000;
+  const tonnageSource = `${profile.costLayers.supportedTonnageBasis.source}: priced fabricated steel takeoff lines`;
+
+  if (profile.costLayers.supportedTonnageBasis.approval !== "APPROVED") {
+    for (const category of ["SHOP_LABOR", "DETAILING", "ENGINEERING"] as const) unresolved.add(category);
+    addIssue(issues, "BLOCKER", "SUPPORTED_TONNAGE_POLICY_PENDING", "Supported tonnage policy requires company approval.", "project-costs");
+  } else if (validPositive(supportedTons)) {
+    const hoursPerTon = profile.labor.shopHoursPerTon;
+    if (hoursPerTon.approval === "APPROVED") {
+      lines.push(layerLine(
+        "SHOP_LABOR", profile.labor.shopRate,
+        supportedTons * hoursPerTon.value, "PER_HOUR",
+        "SUPPORTED_TONS_TIMES_HOURS_PER_TON_TIMES_RATE",
+        `${tonnageSource}; ${hoursPerTon.source}`, profile,
+        { supportedFabricatedSteelWeightLb: supportedWeightLb, supportedTonnage: supportedTons },
+      ));
+    } else {
+      unresolved.add("SHOP_LABOR");
+      addIssue(issues, "BLOCKER", "SHOP_HOURS_POLICY_PENDING", "Shop hours per ton requires company approval.", "shop-labor");
+    }
+    lines.push(layerLine("DETAILING", "SERVICE_DETAILING", supportedTons, "PER_TON", "SUPPORTED_TONS_TIMES_RATE", tonnageSource, profile, { supportedFabricatedSteelWeightLb: supportedWeightLb, supportedTonnage: supportedTons }));
+    lines.push(layerLine("ENGINEERING", "SERVICE_ENGINEERING", supportedTons, "PER_TON", "SUPPORTED_TONS_TIMES_RATE", tonnageSource, profile, { supportedFabricatedSteelWeightLb: supportedWeightLb, supportedTonnage: supportedTons }));
+  }
+
+  const loadCount = input.costInputs?.freightLoadCount;
+  if (loadCount && validPositive(loadCount.quantity)) {
+    lines.push(layerLine("FREIGHT", profile.freight.outboundRate, loadCount.quantity, "PER_LOAD", "LOAD_COUNT_TIMES_RATE", loadCount.source, profile));
+  } else {
+    unresolved.add("FREIGHT");
+    addIssue(issues, "BLOCKER", "FREIGHT_LOAD_COUNT_REQUIRED", "Freight requires an explicit approved or calculated load count.", "freight");
+  }
+
+  const equipment = input.costInputs?.equipment;
+  if (equipment?.required) {
+    if (!equipment.selections?.length) {
+      unresolved.add("EQUIPMENT");
+      addIssue(issues, "BLOCKER", "EQUIPMENT_SELECTION_REQUIRED", "Required equipment selection and duration are unresolved.", "equipment");
+    } else {
+      for (const selection of equipment.selections) {
+        if (!validPositive(selection.quantity)) {
+          unresolved.add("EQUIPMENT");
+          addIssue(issues, "BLOCKER", "EQUIPMENT_QUANTITY_REQUIRED", "Selected equipment requires a positive quantity or duration.", selection.rateKey);
+          continue;
+        }
+        const rate = requireStandardRate(profile.rateSource, selection.rateKey);
+        lines.push(layerLine("EQUIPMENT", selection.rateKey, selection.quantity, rate.unit, "SELECTED_QUANTITY_TIMES_RATE", selection.inputSource, profile));
+      }
+    }
+  }
+
+  const erection = input.costInputs?.erection;
+  if (erection?.required) {
+    if (!erection.classification || !validPositive(erection.hours) || !erection.methodologySource?.trim()) {
+      unresolved.add("ERECTION_LABOR");
+      addIssue(issues, "BLOCKER", "ERECTION_INPUTS_REQUIRED", "Erection classification, hours, and methodology are required independently of shop hours.", "erection-labor");
+    } else {
+      lines.push(layerLine("ERECTION_LABOR", profile.labor.erectionRateByDistance[erection.classification], erection.hours, "PER_HOUR", "ERECTION_HOURS_TIMES_RATE", erection.methodologySource, profile));
+    }
+  }
+
+  let taxableSubtotal: number | null = null;
+  let tax: number | null = null;
+  const taxPolicy = profile.costLayers.tax.taxableCostCategories;
+  if (taxPolicy.approval !== "APPROVED") {
+    unresolved.add("TAX");
+    addIssue(issues, "REVIEW", "TAX_POLICY_PENDING", "Taxable cost-category policy requires company confirmation; tax was not applied.", "tax");
+  } else {
+    taxableSubtotal = roundCurrency(
+      (taxPolicy.value.includes("MATERIAL") ? sumCost(material) : 0) +
+      (taxPolicy.value.includes("HARDWARE") ? sumCost(hardware) : 0) +
+      (taxPolicy.value.includes("ALLOWANCE") ? allowances.reduce((sum, line) => sum + line.extendedCost, 0) : 0),
+    );
+    if (validPositive(taxableSubtotal)) {
+      const taxLine = layerLine("TAX", "SALES_TAX", taxableSubtotal, "PERCENT", "TAXABLE_SUBTOTAL_TIMES_RATE", taxPolicy.source, profile, { taxableSubtotal });
+      lines.push(taxLine);
+      tax = taxLine.extendedCost;
+    }
+  }
+
+  const indirectCostSubtotal = sumLayerCosts(lines, ["SHOP_LABOR", "DETAILING", "ENGINEERING", "FREIGHT", "EQUIPMENT", "ERECTION_LABOR"]);
+  const markupBasis = roundCurrency(directCostSubtotal + indirectCostSubtotal);
+  let markup = 0;
+  if (profile.costLayers.markupBasis.approval === "APPROVED" && validPositive(markupBasis)) {
+    const rate = requireStandardRate(profile.rateSource, profile.markup.standardMultiplier);
+    if (rate.unit !== "MULTIPLIER" || rate.amount <= 1) throw new TypeError("Standard markup must be a multiplier greater than one.");
+    markup = roundCurrency(markupBasis * (rate.amount - 1));
+    lines.push({
+      id: "project-cost:MARKUP", costCategory: "MARKUP",
+      rateKey: profile.markup.standardMultiplier,
+      rateSource: `${profile.rateSource.id}:${rate.source}`,
+      quantity: markupBasis, unit: rate.unit,
+      calculationMethod: "SUPPORTED_COSTS_TIMES_MARKUP_PERCENT",
+      dependencySource: profile.costLayers.markupBasis.source,
+      extendedCost: markup,
+      status: unresolved.size ? "PROVISIONAL" : "FINAL",
+      basis: { supportedCostSubtotal: markupBasis },
+    });
+  } else if (profile.costLayers.markupBasis.approval !== "APPROVED") {
+    unresolved.add("MARKUP");
+    addIssue(issues, "BLOCKER", "MARKUP_POLICY_PENDING", "Markup basis requires company approval.", "markup");
+  }
+
+  return { lines, issues, indirectCostSubtotal, taxableSubtotal, tax, markup, unresolvedCategories: [...unresolved] };
+}
+
+function layerLine(
+  category: Exclude<ProjectLayerCostCategory, "MARKUP">,
+  rateKey: ForgedIronworksRateKey,
+  quantity: number,
+  expectedUnit: RateUnit,
+  calculationMethod: ProjectCostLayerLine["calculationMethod"],
+  dependencySource: string,
+  profile: CompanyEstimatingProfile,
+  basis?: ProjectCostLayerLine["basis"],
+): ProjectCostLayerLine {
+  const rate = requireStandardRate(profile.rateSource, rateKey);
+  if (rate.unit !== expectedUnit) throw new TypeError(`${rateKey} must use ${expectedUnit}, received ${rate.unit}.`);
+  const extendedCost = roundCurrency(quantity * rate.amount);
+  if (!validPositive(extendedCost)) throw new Error(`Pricing blocked: ${rateKey} produced a zero or invalid cost.`);
+  return { id: `project-cost:${category}:${rateKey}`, costCategory: category, rateKey, rateSource: `${profile.rateSource.id}:${rate.source}`, quantity, unit: rate.unit, calculationMethod, dependencySource, extendedCost, status: "FINAL", basis };
+}
+
+function sumLayerCosts(lines: readonly ProjectCostLayerLine[], categories: readonly ProjectLayerCostCategory[]): number {
+  return roundCurrency(lines.filter((line) => categories.includes(line.costCategory)).reduce((sum, line) => sum + line.extendedCost, 0));
 }
 
 function directRateMapping(line: TakeoffLine): { rateKey: ForgedIronworksRateKey; unit: "LB" | "EA"; costCategory: "MATERIAL" | "HARDWARE" } | undefined {

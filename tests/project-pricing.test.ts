@@ -11,8 +11,12 @@ function result() {
       takeoffLines: ALPHABET_ACADEMY_FIXTURE.takeoffLines,
       assemblyExceptions: ALPHABET_ACADEMY_FIXTURE.unresolvedAssemblyExceptions,
       requiredQuoteRateKeys: ALPHABET_ACADEMY_FIXTURE.requiredQuoteRateKeys,
+      costInputs: {
+        equipment: { required: true },
+        erection: { required: true },
+      },
     },
-    FORGED_IRONWORKS_ESTIMATING_PROFILE.rateSource,
+    FORGED_IRONWORKS_ESTIMATING_PROFILE,
   );
 }
 
@@ -108,7 +112,7 @@ describe("project-level pricing", () => {
         assemblyExceptions: fixture.unresolvedAssemblyExceptions,
         requiredQuoteRateKeys: fixture.requiredQuoteRateKeys,
       },
-      FORGED_IRONWORKS_ESTIMATING_PROFILE.rateSource,
+      FORGED_IRONWORKS_ESTIMATING_PROFILE,
     );
 
     expect(priced.pricedHardwareLines.filter((line) => line.rateKey === "HARDWARE_EPOXY_ANCHOR")).toHaveLength(1);
@@ -121,7 +125,7 @@ describe("project-level pricing", () => {
     };
     const priced = priceProject(
       { takeoffLines: [invalidWf] },
-      FORGED_IRONWORKS_ESTIMATING_PROFILE.rateSource,
+      FORGED_IRONWORKS_ESTIMATING_PROFILE,
     );
 
     expect(priced.pricedMaterialLines).toEqual([]);
