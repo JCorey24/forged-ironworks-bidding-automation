@@ -1,5 +1,6 @@
 import { FORGED_IRONWORKS_ESTIMATING_PROFILE } from "../config/company-estimating-profile";
 import { requireStandardRate } from "../rates/rate-source";
+import { calculateRectangularPlateWeightLb } from "../materials/steel-weight";
 import { STANDARD_ASSEMBLIES } from "./standard-assemblies";
 import type {
   AssemblyApplication,
@@ -10,9 +11,6 @@ import type {
   PlateDimensions,
   StandardAssemblyId,
 } from "./assembly-types";
-
-// Physical estimating constant; this supplies density only, never plate geometry.
-const STEEL_DENSITY_LB_PER_CUBIC_INCH = 0.2836;
 
 export function resolveStandardAssemblies(
   input: AssemblyMemberInput,
@@ -89,7 +87,7 @@ function plateAssembly(
 
   const components: AssemblyComponent[] = [];
   if (validPlate(dimensions)) {
-    components.push(component("plate", plateWeight(dimensions), "LB", "CALCULATED", "MATERIAL_BURNED_PLATE"));
+    components.push(component("plate", calculateRectangularPlateWeightLb(dimensions), "LB", "CALCULATED", "MATERIAL_BURNED_PLATE"));
   }
   if (id === "HSS_COLUMN_BASE" && positiveInteger(anchorRodCount)) {
     components.push(component("anchor-rods", anchorRodCount, "EA", "DRAWING", "HARDWARE_ANCHOR_ROD"));
@@ -143,7 +141,7 @@ function joistBearing(input: AssemblyMemberInput): AssemblyApplication {
     components.push(
       component(
         "bearing-plates",
-        plateWeight(bearing!.plate!) * bearing!.count!,
+        calculateRectangularPlateWeightLb(bearing!.plate!) * bearing!.count!,
         "LB",
         "CALCULATED",
         "MATERIAL_BURNED_PLATE",
@@ -313,18 +311,10 @@ function validPlate(value: PlateDimensions | undefined): value is PlateDimension
   return !!value && positive(value.lengthIn) && positive(value.widthIn) && positive(value.thicknessIn);
 }
 
-function plateWeight(plate: PlateDimensions): number {
-  return roundWeight(plate.lengthIn * plate.widthIn * plate.thicknessIn * STEEL_DENSITY_LB_PER_CUBIC_INCH);
-}
-
 function positive(value: number | null | undefined): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
 function positiveInteger(value: number | undefined): value is number {
   return positive(value) && Number.isInteger(value);
-}
-
-function roundWeight(value: number): number {
-  return Math.round(value * 100) / 100;
 }

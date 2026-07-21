@@ -5,6 +5,8 @@ export * from "./config/scope-overrides";
 export * from "./config/company-estimating-profile";
 export * from "./rates/rate-source";
 export * from "./rates/forged-ironworks-rates";
+export * from "./materials/steel-weight";
+export * from "./fixtures/alphabet-academy";
 export * from "./assemblies/assembly-types";
 export * from "./assemblies/assembly-approval";
 export * from "./assemblies/standard-assemblies";

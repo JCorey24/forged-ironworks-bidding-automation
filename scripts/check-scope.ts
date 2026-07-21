@@ -15,7 +15,7 @@ const sampleLines: TakeoffLine[] = [
     quantity: 10,
     unit: "EA",
     lengthFt: null,
-    source: { sheet: "S-302", detail: "4", revision: "2026-05-01" },
+    source: { category: "DRAWING_DERIVED", sheet: "S-302", detail: "4", revision: "2026-05-01" },
     confidence: "HIGH",
     reviewRequired: false,
     scope: resolveLineItemScope(
@@ -37,7 +37,7 @@ const sampleLines: TakeoffLine[] = [
     quantity: 1,
     unit: "EA",
     lengthFt: 20,
-    source: { sheet: "S-102", revision: "2026-05-01" },
+    source: { category: "DRAWING_DERIVED", sheet: "S-102", revision: "2026-05-01" },
     confidence: "HIGH",
     reviewRequired: false,
     scope: resolveLineItemScope(

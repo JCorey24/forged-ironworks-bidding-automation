@@ -17,7 +17,7 @@ function makeLine(overrides: Partial<TakeoffLine> = {}): TakeoffLine {
     quantity: 1,
     unit: "EA",
     lengthFt: 12.5,
-    source: { sheet: "S-201", detail: "Column schedule" },
+    source: { category: "DRAWING_DERIVED", sheet: "S-201", detail: "Column schedule" },
     confidence: "HIGH",
     reviewRequired: false,
     scope: resolveLineItemScope("FURNISH_AND_ERECT", "HSS_COLUMN", {
@@ -37,7 +37,7 @@ describe("takeoff traceability validation", () => {
 
   it("blocks a member whose mark, section, or drawing sheet is missing", () => {
     const issues = validateTakeoffLine(
-      makeLine({ memberMark: "", section: "", source: { sheet: "" } }),
+      makeLine({ memberMark: "", section: "", source: { category: "DRAWING_DERIVED", sheet: "" } }),
     );
 
     expect(
