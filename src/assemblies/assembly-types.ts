@@ -13,7 +13,11 @@ export const STANDARD_ASSEMBLY_IDS = [
 export type StandardAssemblyId = (typeof STANDARD_ASSEMBLY_IDS)[number];
 export type AssemblyConfidence = "HIGH" | "MEDIUM" | "LOW";
 export type AssemblyMaturity = "PRODUCTION_READY" | "PROVISIONAL";
-export type AssemblyStatus = "APPLIED" | "REVIEW_REQUIRED" | "BLOCKED";
+export type AssemblyOutcome =
+  | "AUTO_APPLY"
+  | "APPLY_ALLOWANCE"
+  | "REVIEW_REQUIRED"
+  | "BLOCKED";
 
 export interface StandardAssemblyDefinition {
   id: StandardAssemblyId;
@@ -82,6 +86,7 @@ export interface AssemblyException {
   lineItemId: string;
   severity: "REVIEW" | "BLOCKER";
   code: string;
+  cause: string;
   message: string;
 }
 
@@ -90,11 +95,45 @@ export interface AssemblyApplication {
   assemblyVersion: number;
   lineItemId: string;
   instanceCount: number;
-  status: AssemblyStatus;
+  outcome: AssemblyOutcome;
   confidence: AssemblyConfidence;
   components: AssemblyComponent[];
   additionalShopHours: number;
+  allowance?: EstimatingAllowance;
   exception?: AssemblyException;
+}
+
+export interface AllowanceQuantityBasis {
+  type: "PER_MEMBER" | "PER_END" | "FIXED_QUANTITY";
+  quantity: number;
+  description: string;
+}
+
+export type AllowancePricingBasis =
+  | {
+      type: "RATE_KEY";
+      rateKey: ForgedIronworksRateKey;
+      unitsPerQuantity: number;
+    }
+  | {
+      type: "FIXED_AMOUNT";
+      amount: number;
+      currency: "USD";
+    };
+
+export interface EstimatingAllowance {
+  id: string;
+  assemblyId: StandardAssemblyId;
+  assemblyVersion: number;
+  quantityBasis: AllowanceQuantityBasis;
+  pricingBasis: AllowancePricingBasis;
+  approvalSource: string;
+  confidence: AssemblyConfidence;
+  reviewThreshold: {
+    type: "QUANTITY_ABOVE" | "EXTENDED_COST_ABOVE";
+    value: number;
+  };
+  mayAppearInFinalProposal: boolean;
 }
 
 export interface AssemblyResolution {

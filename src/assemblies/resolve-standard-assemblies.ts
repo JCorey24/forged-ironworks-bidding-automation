@@ -23,6 +23,7 @@ export function resolveStandardAssemblies(
       lineItemId: input.lineItemId,
       severity: input.condition === "NONSTANDARD" ? "REVIEW" : "BLOCKER",
       code: input.condition === "NONSTANDARD" ? "NONSTANDARD_CONDITION" : "CONDITION_UNKNOWN",
+      cause: `member condition is ${input.condition.toLowerCase()}`,
       message: `${input.memberMark}: standard assemblies were not applied because the condition is ${input.condition.toLowerCase()}.`,
     };
     return { applications: [], exceptions: [exception] };
@@ -216,6 +217,7 @@ function result(
         lineItemId: input.lineItemId,
         severity,
         code: severity === "BLOCKER" ? "ASSEMBLY_INPUT_BLOCKED" : "ASSEMBLY_REVIEW_REQUIRED",
+        cause: reasons.join(", "),
         message: `${input.memberMark} ${definition.name}: ${reasons.join(", ")}.`,
       } satisfies AssemblyException
     : undefined;
@@ -231,7 +233,7 @@ function result(
     assemblyVersion: definition.version,
     lineItemId: input.lineItemId,
     instanceCount,
-    status: exception ? (severity === "BLOCKER" ? "BLOCKED" : "REVIEW_REQUIRED") : "APPLIED",
+    outcome: exception ? (severity === "BLOCKER" ? "BLOCKED" : "REVIEW_REQUIRED") : "AUTO_APPLY",
     confidence: definition.confidence,
     components,
     additionalShopHours: 0,

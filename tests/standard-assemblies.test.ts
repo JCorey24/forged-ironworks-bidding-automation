@@ -54,7 +54,7 @@ describe("standard assembly library", () => {
     const result = resolveStandardAssemblies(normalHss());
     const base = result.applications.find((item) => item.assemblyId === "HSS_COLUMN_BASE");
 
-    expect(base?.status).toBe("APPLIED");
+    expect(base?.outcome).toBe("AUTO_APPLY");
     expect(base?.components).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: "plate", unit: "LB", source: "CALCULATED" }),
@@ -82,14 +82,14 @@ describe("standard assembly library", () => {
     expect(nailer?.components[0]).toEqual(
       expect.objectContaining({ quantity: 13, rateKey: "HARDWARE_WOOD_NAILER", quoteRequired: true }),
     );
-    expect(nailer?.status).toBe("BLOCKED");
+    expect(nailer?.outcome).toBe("BLOCKED");
   });
 
   it("does not invent plate weight when required dimensions are missing", () => {
     const result = resolveStandardAssemblies(normalHss({ basePlate: undefined }));
     const base = result.applications.find((item) => item.assemblyId === "HSS_COLUMN_BASE");
 
-    expect(base?.status).toBe("BLOCKED");
+    expect(base?.outcome).toBe("BLOCKED");
     expect(base?.components.some((item) => item.id === "plate")).toBe(false);
     expect(base?.exception?.message).toContain("plate dimensions");
   });
@@ -113,7 +113,7 @@ describe("standard assembly library", () => {
       normalHss({ globalShopHoursPerTonEnabled: false }),
     );
 
-    expect(result.applications.every((item) => item.status === "BLOCKED")).toBe(true);
+    expect(result.applications.every((item) => item.outcome === "BLOCKED")).toBe(true);
     expect(result.exceptions[0].message).toContain("shop-hours-per-ton");
   });
 });

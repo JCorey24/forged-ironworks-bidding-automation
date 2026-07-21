@@ -4,6 +4,7 @@ import {
   type ForgedIronworksRateKey,
 } from "../rates/forged-ironworks-rates";
 import type { RateSource } from "../rates/rate-source";
+import type { AssemblyApprovalPolicy } from "../assemblies/assembly-approval";
 
 export type ApprovalStatus = "APPROVED" | "PENDING_CONFIRMATION";
 
@@ -50,6 +51,7 @@ export interface CompanyEstimatingProfile {
     quoteRequiredBlocksPricing: true;
     unexplainedZeroBlocksSubmission: true;
   };
+  assemblyApprovalPolicy: AssemblyApprovalPolicy;
 }
 
 const RATES_SOURCE = "reference/rates.md";
@@ -116,8 +118,35 @@ export const FORGED_IRONWORKS_ESTIMATING_PROFILE: CompanyEstimatingProfile = {
     quoteRequiredBlocksPricing: true,
     unexplainedZeroBlocksSubmission: true,
   },
+  assemblyApprovalPolicy: {
+    id: "forged-ironworks-assembly-approval-v1",
+    version: 1,
+    rules: {
+      HSS_COLUMN_BASE: pendingRule("HSS_COLUMN_BASE", "AUTO_APPLY", "BLOCKED"),
+      HSS_COLUMN_TOP: pendingRule("HSS_COLUMN_TOP", "AUTO_APPLY", "BLOCKED"),
+      WF_BEAM_END: pendingRule("WF_BEAM_END", "AUTO_APPLY", "REVIEW_REQUIRED"),
+      JOIST_BEARING_PLATE: pendingRule("JOIST_BEARING_PLATE", "BLOCKED", "BLOCKED"),
+      WOOD_NAILER_HARDWARE: pendingRule("WOOD_NAILER_HARDWARE", "BLOCKED", "BLOCKED"),
+      PERIMETER_ANGLE_ANCHOR: pendingRule("PERIMETER_ANGLE_ANCHOR", "AUTO_APPLY", "BLOCKED"),
+      BRIDGING_TERMINATION: pendingRule("BRIDGING_TERMINATION", "BLOCKED", "BLOCKED"),
+    },
+  },
 };
 
 function approved(value: number): CompanyDefault<number> {
   return { value, approval: "APPROVED", source: RATES_SOURCE };
+}
+
+function pendingRule(
+  assemblyId: keyof AssemblyApprovalPolicy["rules"],
+  completeInputOutcome: "AUTO_APPLY" | "REVIEW_REQUIRED" | "BLOCKED",
+  incompleteInputOutcome: "REVIEW_REQUIRED" | "BLOCKED",
+): AssemblyApprovalPolicy["rules"][typeof assemblyId] {
+  return {
+    assemblyId,
+    assemblyVersion: 1,
+    managementApproval: "PENDING",
+    completeInputOutcome,
+    incompleteInputOutcome,
+  };
 }
