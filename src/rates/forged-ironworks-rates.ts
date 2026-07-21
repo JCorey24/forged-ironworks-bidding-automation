@@ -48,6 +48,8 @@ export const FORGED_IRONWORKS_RATE_KEYS = [
   "BUYOUT_GRATING",
   "BUYOUT_FALL_PROTECTION_ANCHOR",
   "HARDWARE_JOIST_BEARING",
+  "HARDWARE_WOOD_NAILER",
+  "HARDWARE_BRIDGING_TERMINATION",
 ] as const;
 
 export type ForgedIronworksRateKey =
@@ -106,6 +108,12 @@ const RATES: Readonly<
   BUYOUT_FALL_PROTECTION_ANCHOR: quoteRequired("Quote per installation."),
   HARDWARE_JOIST_BEARING: quoteRequired(
     "Rate and quantification method require estimator confirmation.",
+  ),
+  HARDWARE_WOOD_NAILER: quoteRequired(
+    "Fastener specification and supplier price require estimator confirmation.",
+  ),
+  HARDWARE_BRIDGING_TERMINATION: quoteRequired(
+    "Termination detail and supplier price require estimator confirmation.",
   ),
 };
 

@@ -54,7 +54,13 @@ describe("centralized company rates", () => {
     expect(price).toThrow('required rate "MATERIAL_UNKNOWN" is missing');
   });
 
-  it.each(["STRUCTURAL_LH_JOIST", "STRUCTURAL_METAL_DECK"] as const)(
+  it.each([
+    "STRUCTURAL_LH_JOIST",
+    "STRUCTURAL_METAL_DECK",
+    "HARDWARE_JOIST_BEARING",
+    "HARDWARE_WOOD_NAILER",
+    "HARDWARE_BRIDGING_TERMINATION",
+  ] as const)(
     "keeps %s quote-required instead of allowing a zero price",
     (rateKey) => {
       expect(() =>
