@@ -1,4 +1,6 @@
 import type { LineItemScope } from "../models/scope";
+import type { RateSource } from "../rates/rate-source";
+import { requireStandardRate } from "../rates/rate-source";
 
 export class UnresolvedScopeError extends Error {
   constructor(message: string) {
@@ -30,6 +32,23 @@ export function calculateMaterialCost(
   }
 
   return roundCurrency(weightLb * ratePerLb);
+}
+
+export function calculateMaterialCostFromRates<RateKey extends string>(
+  weightLb: number,
+  rateKey: RateKey,
+  scope: LineItemScope,
+  rateSource: RateSource<RateKey>,
+): number {
+  const rate = requireStandardRate(rateSource, rateKey);
+
+  if (rate.unit !== "PER_LB") {
+    throw new TypeError(
+      `Material rate "${rateKey}" must use unit PER_LB, received ${rate.unit}.`,
+    );
+  }
+
+  return calculateMaterialCost(weightLb, rate.amount, scope);
 }
 
 export function calculateShopLaborCost(
