@@ -113,6 +113,8 @@ export interface ProjectUnpricedLine {
   reasonCode: string;
   reason: string;
   rateKey?: ForgedIronworksRateKey;
+  quantity?: number;
+  unit?: string;
 }
 
 export interface ProjectQuoteRequiredLine extends ProjectUnpricedLine {
@@ -235,7 +237,7 @@ export function priceProject(
 
     const quoteKey = quoteRateKey(line);
     if (quoteKey) {
-      quotes.push({ takeoffRecordId: line.id, description: line.description, reasonCode: "SUPPLIER_QUOTE_REQUIRED", reason: `Supplier quote required for ${quoteKey}.`, rateKey: quoteKey });
+      quotes.push({ takeoffRecordId: line.id, description: line.description, reasonCode: "SUPPLIER_QUOTE_REQUIRED", reason: `Supplier quote required for ${quoteKey}.`, rateKey: quoteKey, quantity: line.quantity, unit: line.unit });
       addIssue(issues, "BLOCKER", "SUPPLIER_QUOTE_REQUIRED", quoteKey, line.id);
       continue;
     }
@@ -525,7 +527,7 @@ function assertCompatibleRate(rate: StandardRate, unit: "LB" | "EA", key: string
 }
 
 function addUnresolved(lines: ProjectUnpricedLine[], issues: ProjectPricingIssue[], line: TakeoffLine, code: string, reason: string, rateKey?: ForgedIronworksRateKey): void {
-  lines.push({ takeoffRecordId: line.id, description: line.description, reasonCode: code, reason, rateKey });
+  lines.push({ takeoffRecordId: line.id, description: line.description, reasonCode: code, reason, rateKey, quantity: line.quantity, unit: line.unit });
   addIssue(issues, "BLOCKER", code, reason, line.id);
 }
 
