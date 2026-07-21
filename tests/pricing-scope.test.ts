@@ -78,4 +78,21 @@ describe("scope-aware pricing", () => {
       RangeError,
     );
   });
+
+  it("rejects zero rates instead of completing a zero-dollar cost", () => {
+    const scope = resolveLineItemScope(
+      "FURNISH_AND_ERECT",
+      "STRUCTURAL_BEAM",
+      {
+        finish: "PRIME",
+        taxTreatment: "TAXABLE",
+        resolutionStatus: "RESOLVED",
+        scopeSource: "Test",
+      },
+    );
+
+    expect(() => calculateMaterialCost(1000, 0, scope)).toThrow(RangeError);
+    expect(() => calculateShopLaborCost(10, 0, scope)).toThrow(RangeError);
+    expect(() => calculateErectionCost(10, 0, scope)).toThrow(RangeError);
+  });
 });
